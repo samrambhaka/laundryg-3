@@ -6,6 +6,7 @@ import CustomerLogin from "@/pages/CustomerLogin";
 import CustomerHome from "@/pages/CustomerHome";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminPanel from "@/pages/AdminPanel";
+import SuperAdminLogin from "@/pages/SuperAdminLogin";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/customer-home" element={<CustomerHome />} />
         <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/super-admin-login" element={<SuperAdminLogin />} />
       </Routes>
     </BrowserRouter>
   );
