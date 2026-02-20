@@ -76,14 +76,15 @@ const AdminPanel = () => {
 
   // Modals
   const [showPanchayathModal, setShowPanchayathModal] = useState(false);
-  const [showWardModal, setShowWardModal] = useState(false);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
 
+  // Expanded panchayath (to show wards)
+  const [expandedPanchayathId, setExpandedPanchayathId] = useState<string | null>(null);
+
   // Forms
   const [panchayathName, setPanchayathName] = useState("");
-  const [wardName, setWardName] = useState("");
-  const [wardPanchayathId, setWardPanchayathId] = useState("");
+  const [panchayathWardCount, setPanchayathWardCount] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [featureForm, setFeatureForm] = useState({ name: "", category: "clothing", price_wash: "", price_iron: "", price_wash_iron: "" });
@@ -169,40 +170,40 @@ const AdminPanel = () => {
   // --- Panchayath CRUD ---
   const savePanchayath = async () => {
     if (!panchayathName.trim()) return;
+    const wardCount = parseInt(panchayathWardCount) || 0;
+
     if (editingId) {
       await supabase.from("panchayaths").update({ name: panchayathName.trim() }).eq("id", editingId);
       toast.success("Panchayath updated");
     } else {
-      await supabase.from("panchayaths").insert({ name: panchayathName.trim() });
-      toast.success("Panchayath added");
+      const { data: newPanchayath, error } = await supabase
+        .from("panchayaths")
+        .insert({ name: panchayathName.trim() })
+        .select()
+        .single();
+      if (error || !newPanchayath) {
+        toast.error("Failed to add panchayath");
+        return;
+      }
+      // Auto-create wards 1 to wardCount
+      if (wardCount > 0) {
+        const wardInserts = Array.from({ length: wardCount }, (_, i) => ({
+          name: `Ward ${i + 1}`,
+          panchayath_id: newPanchayath.id,
+        }));
+        await supabase.from("wards").insert(wardInserts);
+      }
+      toast.success(`Panchayath added${wardCount > 0 ? ` with ${wardCount} wards` : ""}`);
     }
-    setPanchayathName(""); setEditingId(null); setShowPanchayathModal(false);
+    setPanchayathName(""); setPanchayathWardCount(""); setEditingId(null); setShowPanchayathModal(false);
     fetchData();
   };
 
   const deletePanchayath = async (id: string) => {
+    // Delete wards first, then panchayath
+    await supabase.from("wards").delete().eq("panchayath_id", id);
     await supabase.from("panchayaths").delete().eq("id", id);
     toast.success("Panchayath deleted");
-    fetchData();
-  };
-
-  // --- Ward CRUD ---
-  const saveWard = async () => {
-    if (!wardName.trim() || !wardPanchayathId) return;
-    if (editingId) {
-      await supabase.from("wards").update({ name: wardName.trim(), panchayath_id: wardPanchayathId }).eq("id", editingId);
-      toast.success("Ward updated");
-    } else {
-      await supabase.from("wards").insert({ name: wardName.trim(), panchayath_id: wardPanchayathId });
-      toast.success("Ward added");
-    }
-    setWardName(""); setWardPanchayathId(""); setEditingId(null); setShowWardModal(false);
-    fetchData();
-  };
-
-  const deleteWard = async (id: string) => {
-    await supabase.from("wards").delete().eq("id", id);
-    toast.success("Ward deleted");
     fetchData();
   };
 
@@ -388,69 +389,77 @@ const AdminPanel = () => {
 
         {/* === LOCATIONS TAB === */}
         {activeTab === "locations" && (
-          <div className="space-y-6">
-            {/* Panchayaths */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary" /> Panchayaths
-                </h3>
-                <button
-                  onClick={() => { setEditingId(null); setPanchayathName(""); setShowPanchayathModal(true); }}
-                  className="flex items-center gap-1 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90"
-                >
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-              <div className="space-y-2">
-                {panchayaths.map((p) => (
-                  <div key={p.id} className="bg-card rounded-xl border border-border px-4 py-3 flex items-center justify-between">
-                    <span className="font-medium text-foreground">{p.name}</span>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEditingId(p.id); setPanchayathName(p.name); setShowPanchayathModal(true); }}
-                        className="text-muted-foreground hover:text-primary transition-colors"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => deletePanchayath(p.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" /> Panchayaths & Wards
+              </h3>
+              <button
+                onClick={() => { setEditingId(null); setPanchayathName(""); setPanchayathWardCount(""); setShowPanchayathModal(true); }}
+                className="flex items-center gap-1 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90"
+              >
+                <Plus className="w-4 h-4" /> Add Panchayath
+              </button>
             </div>
 
-            {/* Wards */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-secondary" /> Wards
-                </h3>
-                <button
-                  onClick={() => { setEditingId(null); setWardName(""); setWardPanchayathId(""); setShowWardModal(true); }}
-                  className="flex items-center gap-1 text-sm bg-primary text-primary-foreground px-3 py-1.5 rounded-lg hover:opacity-90"
-                >
-                  <Plus className="w-4 h-4" /> Add
-                </button>
-              </div>
-              <div className="space-y-2">
-                {wards.map((w) => (
-                  <div key={w.id} className="bg-card rounded-xl border border-border px-4 py-3 flex items-center justify-between">
-                    <div>
-                      <span className="font-medium text-foreground">{w.name}</span>
-                      <span className="text-xs text-muted-foreground ml-2">
-                        {panchayaths.find(p => p.id === w.panchayath_id)?.name}
-                      </span>
+            {panchayaths.length === 0 && (
+              <p className="text-muted-foreground text-center py-8">No panchayaths added yet</p>
+            )}
+
+            <div className="space-y-3">
+              {panchayaths.map((p) => {
+                const pWards = wards.filter(w => w.panchayath_id === p.id);
+                const isExpanded = expandedPanchayathId === p.id;
+                return (
+                  <div key={p.id} className="bg-card rounded-xl border border-border overflow-hidden">
+                    <div className="px-4 py-3 flex items-center justify-between">
+                      <button
+                        className="flex items-center gap-3 flex-1 text-left"
+                        onClick={() => setExpandedPanchayathId(isExpanded ? null : p.id)}
+                      >
+                        <div>
+                          <span className="font-medium text-foreground">{p.name}</span>
+                          <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            {pWards.length} ward{pWards.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <ChevronLeft className={`w-4 h-4 text-muted-foreground ml-auto transition-transform ${isExpanded ? "-rotate-90" : "rotate-180"}`} />
+                      </button>
+                      <div className="flex gap-2 ml-3">
+                        <button onClick={() => { setEditingId(p.id); setPanchayathName(p.name); setPanchayathWardCount(""); setShowPanchayathModal(true); }}
+                          className="text-muted-foreground hover:text-primary transition-colors"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => deletePanchayath(p.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEditingId(w.id); setWardName(w.name); setWardPanchayathId(w.panchayath_id); setShowWardModal(true); }}
-                        className="text-muted-foreground hover:text-primary transition-colors"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => deleteWard(w.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-border bg-muted/30 px-4 py-3">
+                        {pWards.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No wards</p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {pWards.map((w) => (
+                              <div key={w.id} className="flex items-center justify-between bg-background border border-border rounded-lg px-2 py-1.5">
+                                <span className="text-xs text-foreground">{w.name}</span>
+                                <button onClick={async () => {
+                                  await supabase.from("wards").delete().eq("id", w.id);
+                                  toast.success("Ward deleted");
+                                  fetchData();
+                                }} className="text-muted-foreground hover:text-destructive ml-1"><Trash2 className="w-3 h-3" /></button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
         )}
+
 
         {/* === FEATURES TAB === */}
         {activeTab === "features" && (
@@ -544,11 +553,28 @@ const AdminPanel = () => {
               <h3 className="font-bold text-foreground">{editingId ? "Edit" : "Add"} Panchayath</h3>
               <button onClick={() => setShowPanchayathModal(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
             </div>
-            <input
-              type="text" placeholder="Panchayath name" value={panchayathName}
-              onChange={(e) => setPanchayathName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring mb-4"
-            />
+            <div className="space-y-3 mb-4">
+              <input
+                type="text" placeholder="Panchayath name" value={panchayathName}
+                onChange={(e) => setPanchayathName(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {!editingId && (
+                <div>
+                  <input
+                    type="number" placeholder="Number of wards (e.g. 25)" value={panchayathWardCount}
+                    onChange={(e) => setPanchayathWardCount(e.target.value)}
+                    min="0" max="200"
+                    className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  {panchayathWardCount && parseInt(panchayathWardCount) > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1.5 ml-1">
+                      Will auto-create Ward 1 to Ward {panchayathWardCount}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <button onClick={savePanchayath}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90">
               {editingId ? "Update" : "Add"} Panchayath
@@ -557,33 +583,8 @@ const AdminPanel = () => {
         </div>
       )}
 
-      {/* Ward Modal */}
-      {showWardModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-          <div className="bg-background rounded-t-2xl p-6 w-full max-w-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-foreground">{editingId ? "Edit" : "Add"} Ward</h3>
-              <button onClick={() => setShowWardModal(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
-            </div>
-            <div className="space-y-3 mb-4">
-              <select value={wardPanchayathId} onChange={(e) => setWardPanchayathId(e.target.value)} required
-                className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring appearance-none">
-                <option value="">Select Panchayath</option>
-                {panchayaths.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <input type="text" placeholder="Ward name" value={wardName}
-                onChange={(e) => setWardName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
-            </div>
-            <button onClick={saveWard}
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90">
-              {editingId ? "Update" : "Add"} Ward
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Feature Modal */}
+
       {showFeatureModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
           <div className="bg-background rounded-t-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
