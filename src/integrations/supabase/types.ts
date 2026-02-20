@@ -14,6 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
+      addon_services: {
+        Row: {
+          booking_charge: number
+          category: string
+          created_at: string
+          description: string | null
+          icon_name: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          booking_charge?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          booking_charge?: number
+          category?: string
+          created_at?: string
+          description?: string | null
+          icon_name?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      admin_credentials: {
+        Row: {
+          created_at: string
+          id: string
+          mobile_number: string
+          name: string
+          panchayath_id: string | null
+          updated_at: string
+          user_id: string
+          ward_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mobile_number: string
+          name: string
+          panchayath_id?: string | null
+          updated_at?: string
+          user_id: string
+          ward_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mobile_number?: string
+          name?: string
+          panchayath_id?: string | null
+          updated_at?: string
+          user_id?: string
+          ward_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_credentials_panchayath_id_fkey"
+            columns: ["panchayath_id"]
+            isOneToOne: false
+            referencedRelation: "panchayaths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_credentials_ward_id_fkey"
+            columns: ["ward_id"]
+            isOneToOne: false
+            referencedRelation: "wards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      laundry_features: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price_iron: number | null
+          price_wash: number | null
+          price_wash_iron: number | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price_iron?: number | null
+          price_wash?: number | null
+          price_wash_iron?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_iron?: number | null
+          price_wash?: number | null
+          price_wash_iron?: number | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       panchayaths: {
         Row: {
           created_at: string
@@ -76,6 +202,50 @@ export type Database = {
             columns: ["ward_id"]
             isOneToOne: false
             referencedRelation: "wards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_bookings: {
+        Row: {
+          addon_service_id: string
+          booking_charge: number
+          created_at: string
+          id: string
+          notes: string | null
+          scheduled_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          addon_service_id: string
+          booking_charge: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          addon_service_id?: string
+          booking_charge?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_bookings_addon_service_id_fkey"
+            columns: ["addon_service_id"]
+            isOneToOne: false
+            referencedRelation: "addon_services"
             referencedColumns: ["id"]
           },
         ]
