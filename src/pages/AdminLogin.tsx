@@ -259,6 +259,16 @@ const AdminLogin = () => {
           </form>
         )}
       </div>
+
+      <div className="text-center mt-6">
+        <button
+          onClick={() => navigate("/super-admin-login")}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary transition-colors underline underline-offset-4"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          Super Admin Portal
+        </button>
+      </div>
     </div>
   );
 };
