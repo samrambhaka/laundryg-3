@@ -92,34 +92,35 @@ const CustomerLogin = () => {
     setLoading(true);
     try {
       const formattedPhone = formatPhone(phone);
-
-      // Sign up with phone as email workaround (no OTP needed)
       const fakeEmail = `customer${digits}@laundryapp.com`;
+
+      // Sign up — trigger auto-creates profile & role via metadata
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: fakeEmail,
-        password: digits, // use phone digits as password
+        password: digits,
+        options: {
+          data: {
+            name: name.trim(),
+            mobile_number: formattedPhone,
+            panchayath_id: panchayathId,
+            ward_id: wardId,
+          },
+        },
       });
+
+      // If user already registered, try signing in instead
+      if (signUpError?.message?.includes("already registered")) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: fakeEmail,
+          password: digits,
+        });
+        if (signInError) throw signInError;
+        toast.success("Welcome back!");
+        navigate("/customer-home");
+        return;
+      }
       if (signUpError) throw signUpError;
-
-      const userId = signUpData.user?.id;
-      if (!userId) throw new Error("Signup failed");
-
-      // Create profile
-      const { error: profileError } = await supabase.from("profiles").insert({
-        user_id: userId,
-        name: name.trim(),
-        mobile_number: formattedPhone,
-        panchayath_id: panchayathId,
-        ward_id: wardId,
-      });
-      if (profileError) throw profileError;
-
-      // Assign customer role
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: userId,
-        role: "customer",
-      });
-      if (roleError) throw roleError;
+      if (!signUpData.user?.id) throw new Error("Signup failed");
 
       toast.success("Registration successful!");
       navigate("/customer-home");
