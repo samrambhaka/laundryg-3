@@ -57,7 +57,7 @@ const CustomerLogin = () => {
 
       if (existingProfile?.name) {
         // Existing customer — sign in with email/password
-        const fakeEmail = `${digits}@customer.local`;
+        const fakeEmail = `customer${digits}@laundryapp.com`;
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: fakeEmail,
           password: digits,
@@ -94,7 +94,7 @@ const CustomerLogin = () => {
       const formattedPhone = formatPhone(phone);
 
       // Sign up with phone as email workaround (no OTP needed)
-      const fakeEmail = `${digits}@customer.local`;
+      const fakeEmail = `customer${digits}@laundryapp.com`;
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: fakeEmail,
         password: digits, // use phone digits as password
