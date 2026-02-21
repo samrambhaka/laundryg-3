@@ -49,28 +49,33 @@ const CustomerLogin = () => {
     try {
       const formattedPhone = formatPhone(phone);
       // Check if customer exists by mobile number in profiles
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("user_id, name")
-        .eq("mobile_number", formattedPhone)
-        .maybeSingle();
+      // First try to sign in — if user exists, this will work
+      const fakeEmail = `customer${digits}@laundryapp.com`;
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: fakeEmail,
+        password: digits,
+      });
 
-      if (existingProfile?.name) {
-        // Existing customer — sign in with email/password
-        const fakeEmail = `customer${digits}@laundryapp.com`;
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: fakeEmail,
-          password: digits,
-        });
-        if (signInError) throw signInError;
-        toast.success(`Welcome back, ${existingProfile.name}!`);
+      if (!signInError) {
+        // Existing customer — sign in successful
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("mobile_number", formattedPhone)
+          .maybeSingle();
+        toast.success(`Welcome back${profile?.name ? `, ${profile.name}` : ""}!`);
         navigate("/customer-home");
         return;
       }
 
-      // New customer: go to signup
-      setStep("signup");
-      toast.info("Please complete your registration");
+      // If sign in failed, user doesn't exist — go to signup
+      if (signInError.message?.includes("Invalid login credentials")) {
+        setStep("signup");
+        toast.info("Please complete your registration");
+        return;
+      }
+
+      throw signInError;
     } catch (err: any) {
       toast.error(err.message);
     } finally {
