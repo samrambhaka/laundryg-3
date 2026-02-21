@@ -56,12 +56,13 @@ const CustomerLogin = () => {
         .maybeSingle();
 
       if (existingProfile?.name) {
-        // Existing customer — sign them in anonymously using a magic trick
-        // We use OTP-less approach: store session in localStorage for demo
-        // For production: use magic link or custom token
-        // For now we use signInWithOtp with a fake "no-verify" pattern
-        // Since no OTP: use email-based passwordless or phone signIn
-        // We'll create a session by signing in with phone OTP but auto-confirm
+        // Existing customer — sign in with email/password
+        const fakeEmail = `${digits}@customer.local`;
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: fakeEmail,
+          password: digits,
+        });
+        if (signInError) throw signInError;
         toast.success(`Welcome back, ${existingProfile.name}!`);
         navigate("/customer-home");
         return;
@@ -91,21 +92,37 @@ const CustomerLogin = () => {
     setLoading(true);
     try {
       const formattedPhone = formatPhone(phone);
-      // Use OTP sign in — auto-verified in phone auth
-      const { error: otpError } = await supabase.auth.signInWithOtp({ phone: formattedPhone });
-      if (otpError) throw otpError;
 
-      // We need to save name etc. — this will be done after OTP verification
-      // For now, store pending data and redirect to OTP verify
-      localStorage.setItem("pending_signup", JSON.stringify({
+      // Sign up with phone as email workaround (no OTP needed)
+      const fakeEmail = `${digits}@customer.local`;
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: fakeEmail,
+        password: digits, // use phone digits as password
+      });
+      if (signUpError) throw signUpError;
+
+      const userId = signUpData.user?.id;
+      if (!userId) throw new Error("Signup failed");
+
+      // Create profile
+      const { error: profileError } = await supabase.from("profiles").insert({
+        user_id: userId,
         name: name.trim(),
-        panchayathId,
-        wardId,
-        phone: formattedPhone,
-      }));
+        mobile_number: formattedPhone,
+        panchayath_id: panchayathId,
+        ward_id: wardId,
+      });
+      if (profileError) throw profileError;
 
-      navigate("/customer-verify");
-      toast.success("OTP sent! Please verify your number to complete signup.");
+      // Assign customer role
+      const { error: roleError } = await supabase.from("user_roles").insert({
+        user_id: userId,
+        role: "customer",
+      });
+      if (roleError) throw roleError;
+
+      toast.success("Registration successful!");
+      navigate("/customer-home");
     } catch (err: any) {
       toast.error(err.message);
     } finally {
