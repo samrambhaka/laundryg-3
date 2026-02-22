@@ -140,6 +140,118 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          addon_service_id: string | null
+          created_at: string
+          id: string
+          item_name: string
+          item_type: string
+          laundry_feature_id: string | null
+          order_id: string
+          quantity: number
+          service_type: string | null
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          addon_service_id?: string | null
+          created_at?: string
+          id?: string
+          item_name: string
+          item_type: string
+          laundry_feature_id?: string | null
+          order_id: string
+          quantity?: number
+          service_type?: string | null
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          addon_service_id?: string | null
+          created_at?: string
+          id?: string
+          item_name?: string
+          item_type?: string
+          laundry_feature_id?: string | null
+          order_id?: string
+          quantity?: number
+          service_type?: string | null
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_addon_service_id_fkey"
+            columns: ["addon_service_id"]
+            isOneToOne: false
+            referencedRelation: "addon_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_laundry_feature_id_fkey"
+            columns: ["laundry_feature_id"]
+            isOneToOne: false
+            referencedRelation: "laundry_features"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          amount_received: number | null
+          assigned_delivery_id: string | null
+          assigned_washer_id: string | null
+          completed_at: string | null
+          created_at: string
+          delivered_at: string | null
+          id: string
+          notes: string | null
+          pickup_at: string | null
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_received?: number | null
+          assigned_delivery_id?: string | null
+          assigned_washer_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          pickup_at?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_received?: number | null
+          assigned_delivery_id?: string | null
+          assigned_washer_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          pickup_at?: string | null
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       panchayaths: {
         Row: {
           created_at: string
