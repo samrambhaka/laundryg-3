@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { LogOut, Shirt, Wrench, Sparkles, Zap, Droplets, Wind, Hammer, Bug, ChevronRight } from "lucide-react";
+import { LogOut, Shirt, Wrench, Sparkles, Zap, Droplets, Wind, Hammer, Bug, ShoppingCart, Plus, ChevronRight } from "lucide-react";
 import logo from "@/assets/laundry_girl.png";
+import { CartProvider, useCart } from "@/components/customer/CartContext";
+import CartSheet from "@/components/customer/CartSheet";
 
 interface AddonService {
   id: string;
@@ -33,15 +35,14 @@ const iconMap: Record<string, React.ReactNode> = {
   wrench: <Wrench className="w-6 h-6" />,
 };
 
-const CustomerHome = () => {
+const CustomerHomeContent = () => {
   const navigate = useNavigate();
+  const { addItem, itemCount, total } = useCart();
   const [profile, setProfile] = useState<{ name: string } | null>(null);
   const [services, setServices] = useState<AddonService[]>([]);
   const [features, setFeatures] = useState<LaundryFeature[]>([]);
   const [tab, setTab] = useState<"laundry" | "services">("laundry");
-  const [bookingServiceId, setBookingServiceId] = useState<string | null>(null);
-  const [bookingNotes, setBookingNotes] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -65,27 +66,27 @@ const CustomerHome = () => {
     navigate("/landing");
   };
 
-  const handleBookService = async (service: AddonService) => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+  const addLaundryItem = (feature: LaundryFeature, serviceType: "wash" | "iron" | "wash_iron", price: number) => {
+    addItem({
+      type: "laundry",
+      name: feature.name,
+      serviceType,
+      unitPrice: price,
+      quantity: 1,
+      laundryFeatureId: feature.id,
+    });
+    toast.success(`${feature.name} (${serviceType === "wash_iron" ? "Wash+Iron" : serviceType === "wash" ? "Wash" : "Iron"}) added to cart`);
+  };
 
-      await supabase.from("service_bookings").insert({
-        user_id: user.id,
-        addon_service_id: service.id,
-        booking_charge: service.booking_charge,
-        notes: bookingNotes || null,
-      });
-
-      toast.success(`${service.name} booked! We'll contact you shortly.`);
-      setBookingServiceId(null);
-      setBookingNotes("");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
+  const addAddonItem = (service: AddonService) => {
+    addItem({
+      type: "addon",
+      name: service.name,
+      unitPrice: service.booking_charge,
+      quantity: 1,
+      addonServiceId: service.id,
+    });
+    toast.success(`${service.name} added to cart`);
   };
 
   return (
@@ -99,9 +100,19 @@ const CustomerHome = () => {
             <p className="font-bold text-base">{profile?.name || "Customer"}</p>
           </div>
         </div>
-        <button onClick={handleSignOut} className="opacity-80 hover:opacity-100 transition-opacity">
-          <LogOut className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setCartOpen(true)} className="relative opacity-90 hover:opacity-100 transition-opacity">
+            <ShoppingCart className="w-5 h-5" />
+            {itemCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {itemCount}
+              </span>
+            )}
+          </button>
+          <button onClick={handleSignOut} className="opacity-80 hover:opacity-100 transition-opacity">
+            <LogOut className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -112,7 +123,7 @@ const CustomerHome = () => {
             tab === "laundry" ? "border-primary text-primary bg-background" : "border-transparent text-muted-foreground"
           }`}
         >
-          <Shirt className="w-4 h-4" /> Laundry Services
+          <Shirt className="w-4 h-4" /> Laundry
         </button>
         <button
           onClick={() => setTab("services")}
@@ -120,15 +131,15 @@ const CustomerHome = () => {
             tab === "services" ? "border-primary text-primary bg-background" : "border-transparent text-muted-foreground"
           }`}
         >
-          <Wrench className="w-4 h-4" /> Add-on Services
+          <Wrench className="w-4 h-4" /> Add-ons
         </button>
       </div>
 
-      <div className="flex-1 p-4 overflow-auto">
+      <div className="flex-1 p-4 overflow-auto pb-24">
         {/* Laundry Features */}
         {tab === "laundry" && (
           <div>
-            <p className="text-sm text-muted-foreground mb-4">Our laundry services & pricing</p>
+            <p className="text-sm text-muted-foreground mb-4">Tap a price to add to your cart</p>
             <div className="space-y-3">
               {features.map((f) => (
                 <div key={f.id} className="bg-card rounded-xl border border-border p-4">
@@ -139,24 +150,42 @@ const CustomerHome = () => {
                     </div>
                     <span className="text-xs capitalize bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{f.category}</span>
                   </div>
-                  <div className="flex gap-3 flex-wrap">
-                    {f.price_wash && (
-                      <div className="bg-primary/10 text-primary rounded-lg px-3 py-1.5 text-center">
+                  <div className="flex gap-2 flex-wrap">
+                    {f.price_wash != null && (
+                      <button
+                        onClick={() => addLaundryItem(f, "wash", f.price_wash!)}
+                        className="bg-primary/10 hover:bg-primary/20 text-primary rounded-lg px-3 py-1.5 text-center transition-colors group"
+                      >
                         <div className="text-xs opacity-70">Wash</div>
-                        <div className="font-bold text-sm">₹{f.price_wash}</div>
-                      </div>
+                        <div className="font-bold text-sm flex items-center gap-1">
+                          ₹{f.price_wash}
+                          <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
                     )}
-                    {f.price_iron && (
-                      <div className="bg-accent/10 text-accent rounded-lg px-3 py-1.5 text-center">
+                    {f.price_iron != null && (
+                      <button
+                        onClick={() => addLaundryItem(f, "iron", f.price_iron!)}
+                        className="bg-accent/10 hover:bg-accent/20 text-accent-foreground rounded-lg px-3 py-1.5 text-center transition-colors group"
+                      >
                         <div className="text-xs opacity-70">Iron</div>
-                        <div className="font-bold text-sm">₹{f.price_iron}</div>
-                      </div>
+                        <div className="font-bold text-sm flex items-center gap-1">
+                          ₹{f.price_iron}
+                          <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
                     )}
-                    {f.price_wash_iron && (
-                      <div className="bg-secondary/10 text-secondary rounded-lg px-3 py-1.5 text-center">
+                    {f.price_wash_iron != null && (
+                      <button
+                        onClick={() => addLaundryItem(f, "wash_iron", f.price_wash_iron!)}
+                        className="bg-secondary/10 hover:bg-secondary/20 text-secondary-foreground rounded-lg px-3 py-1.5 text-center transition-colors group"
+                      >
                         <div className="text-xs opacity-70">Wash+Iron</div>
-                        <div className="font-bold text-sm">₹{f.price_wash_iron}</div>
-                      </div>
+                        <div className="font-bold text-sm flex items-center gap-1">
+                          ₹{f.price_wash_iron}
+                          <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -168,7 +197,7 @@ const CustomerHome = () => {
         {/* Add-on Services */}
         {tab === "services" && (
           <div>
-            <p className="text-sm text-muted-foreground mb-4">Book home services — ₹30 booking charge applies</p>
+            <p className="text-sm text-muted-foreground mb-4">Tap to add home services to your order</p>
             <div className="space-y-3">
               {services.map((s) => (
                 <div key={s.id} className="bg-card rounded-xl border border-border p-4">
@@ -184,14 +213,14 @@ const CustomerHome = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Booking</p>
+                        <p className="text-xs text-muted-foreground">Charge</p>
                         <p className="font-bold text-secondary">₹{s.booking_charge}</p>
                       </div>
                       <button
-                        onClick={() => setBookingServiceId(s.id)}
-                        className="bg-primary text-primary-foreground rounded-xl px-3 py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+                        onClick={() => addAddonItem(s)}
+                        className="bg-primary text-primary-foreground rounded-xl px-3 py-2 text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-1"
                       >
-                        Book
+                        <Plus className="w-4 h-4" /> Add
                       </button>
                     </div>
                   </div>
@@ -202,38 +231,33 @@ const CustomerHome = () => {
         )}
       </div>
 
-      {/* Booking Modal */}
-      {bookingServiceId && (() => {
-        const service = services.find(s => s.id === bookingServiceId);
-        if (!service) return null;
-        return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-            <div className="bg-background rounded-t-2xl p-6 w-full max-w-lg">
-              <h3 className="font-bold text-foreground mb-1">Book {service.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">Booking charge: <span className="font-semibold text-secondary">₹{service.booking_charge}</span></p>
-              <textarea
-                placeholder="Any specific requirements? (optional)"
-                value={bookingNotes}
-                onChange={(e) => setBookingNotes(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none mb-4"
-              />
-              <div className="flex gap-3">
-                <button onClick={() => { setBookingServiceId(null); setBookingNotes(""); }}
-                  className="flex-1 py-3 rounded-xl border border-input text-foreground font-semibold hover:bg-muted transition-colors">
-                  Cancel
-                </button>
-                <button onClick={() => handleBookService(service)} disabled={loading}
-                  className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:opacity-90 disabled:opacity-50">
-                  {loading ? "Booking..." : "Confirm Booking"}
-                </button>
+      {/* Floating Cart Bar */}
+      {itemCount > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4">
+          <button
+            onClick={() => setCartOpen(true)}
+            className="w-full max-w-lg mx-auto flex items-center justify-between bg-primary text-primary-foreground rounded-2xl px-5 py-4 shadow-lg hover:opacity-95 transition-opacity"
+          >
+            <div className="flex items-center gap-3">
+              <div className="bg-primary-foreground/20 rounded-lg px-2.5 py-1 text-sm font-bold">
+                {itemCount} {itemCount === 1 ? "item" : "items"}
               </div>
+              <span className="font-medium text-sm">View Cart</span>
             </div>
-          </div>
-        );
-      })()}
+            <span className="font-bold text-lg">₹{total}</span>
+          </button>
+        </div>
+      )}
+
+      <CartSheet open={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   );
 };
+
+const CustomerHome = () => (
+  <CartProvider>
+    <CustomerHomeContent />
+  </CartProvider>
+);
 
 export default CustomerHome;
